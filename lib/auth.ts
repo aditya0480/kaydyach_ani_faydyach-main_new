@@ -32,6 +32,8 @@ const loginSchema = z.object({
 });
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
+  secret: process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET || "dev-secret-change-in-production-openssl-rand-base64-32",
+  trustHost: true,
   adapter: PrismaAdapter(prisma_db) as Adapter,
   providers: [
     Credentials({

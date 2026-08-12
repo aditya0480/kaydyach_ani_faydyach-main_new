@@ -10,6 +10,10 @@ export const CACHE_TAGS = {
     ORDERS: "orders",
 } as const;
 
+function resolveEbookCover(ebook: { id: string; coverImage: string | null }): string {
+    return `/api/cover/${ebook.id}`;
+}
+
 /**
  * 1. Get all enabled ebooks (Full list)
  * Cached for 1 hour, tagged for manual invalidation.
@@ -22,12 +26,13 @@ export const getEbooks = unstable_cache(
         });
         return data.map((ebook) => ({
             ...ebook,
+            coverImage: resolveEbookCover(ebook),
             price: ebook.price.toString(),
             category: ebook.category || null,
         }));
     },
-    ["all-ebooks"],
-    { tags: [CACHE_TAGS.EBOOKS], revalidate: 86400 }
+    ["all-ebooks-v7"],
+    { tags: [CACHE_TAGS.EBOOKS], revalidate: 3600 }
 );
 
 /**
@@ -42,12 +47,13 @@ export const getEbooksByLanguage = (language: "MARATHI" | "HINDI" | "ENGLISH") =
             });
             return data.map((ebook) => ({
                 ...ebook,
+                coverImage: resolveEbookCover(ebook),
                 price: ebook.price.toString(),
                 category: ebook.category || null,
             }));
         },
-        [`ebooks-lang-${language}`],
-        { tags: [CACHE_TAGS.EBOOKS], revalidate: 86400 }
+        [`ebooks-lang-${language}-v7`],
+        { tags: [CACHE_TAGS.EBOOKS], revalidate: 3600 }
     )();
 
 /**
@@ -61,12 +67,13 @@ export const getComboEbooks = unstable_cache(
         });
         return data.map((ebook) => ({
             ...ebook,
+            coverImage: resolveEbookCover(ebook),
             price: ebook.price.toString(),
             category: ebook.category || null,
         }));
     },
-    ["combo-ebooks"],
-    { tags: [CACHE_TAGS.EBOOKS], revalidate: 86400 }
+    ["combo-ebooks-v7"],
+    { tags: [CACHE_TAGS.EBOOKS], revalidate: 3600 }
 );
 
 /**
@@ -95,17 +102,19 @@ export const getEbookById = cache(async (id: string) => {
 
             return {
                 ...ebook,
+                coverImage: resolveEbookCover(ebook),
                 price: ebook.price.toString(),
                 category: ebook.category || null,
                 includedEbooks: sortedIncludedEbooks.map((item) => ({
                     ...item,
+                    coverImage: resolveEbookCover(item),
                     price: item.price.toString(),
                     category: item.category || null,
                 })),
             };
         },
-        [`ebook-${id}-sorted`],
-        { tags: [CACHE_TAGS.EBOOKS], revalidate: 86400 }
+        [`ebook-${id}-sorted-v3`],
+        { tags: [CACHE_TAGS.EBOOKS], revalidate: 3600 }
     )(id);
 });
 
@@ -136,6 +145,7 @@ export async function searchEbooks(query: string) {
 
     return ebooks.map((ebook) => ({
         ...ebook,
+        coverImage: resolveEbookCover(ebook),
         price: ebook.price.toString(),
         category: ebook.category || null,
     }));

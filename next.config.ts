@@ -20,6 +20,12 @@ const nextConfig: NextConfig = {
     remotePatterns: [
       {
         protocol: 'https',
+        hostname: '**.supabase.co',
+        port: '',
+        pathname: '/**',
+      },
+      {
+        protocol: 'https',
         hostname: 'nirmantestbucket.s3.ap-south-1.amazonaws.com',
         port: '',
         pathname: '/**',

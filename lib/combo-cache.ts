@@ -1,11 +1,10 @@
 import { prisma_db } from "./prisma";
-import { fetchPdfBuffer, s3Client } from "./s3";
+import { fetchPdfBuffer, supabase } from "./s3";
 import { mergePDFs } from "./pdf-watermark";
-import { PutObjectCommand, HeadObjectCommand } from "@aws-sdk/client-s3";
 
 /**
- * Ensures a combo PDF is merged and cached in S3.
- * Returns the S3 key of the cached file.
+ * Ensures a combo PDF is merged and cached in Supabase Storage.
+ * Returns the storage key of the cached file.
  */
 export async function cacheComboPdf(ebookId: string): Promise<string | null> {
     try {
@@ -24,8 +23,7 @@ export async function cacheComboPdf(ebookId: string): Promise<string | null> {
             includedEbooks: rawEbook.includedEbooks.map((ci) => ci.ebook),
         };
 
-        const bucketName = process.env.S3_BUCKET_NAME;
-        if (!bucketName) throw new Error("S3_BUCKET_NAME not set");
+        const bucketName = process.env.SUPABASE_STORAGE_BUCKET || process.env.S3_BUCKET_NAME || "pdfs";
 
         // Cache Key is based on the Combo ID and the IDs of included books to ensure validity if component books change
         // We also include a version or timestamp if we want to force refresh
@@ -35,12 +33,16 @@ export async function cacheComboPdf(ebookId: string): Promise<string | null> {
 
         // 1. Check if already cached
         try {
-            await s3Client.send(new HeadObjectCommand({
-                Bucket: bucketName,
-                Key: cacheKey
-            }));
-            console.info(`[COMBO_CACHE] Hit for ${ebook.title}`);
-            return cacheKey;
+            const fileName = cacheKey.split('/').pop() || "";
+            const { data: files, error: listError } = await supabase.storage
+                .from(bucketName)
+                .list("cache/combos", { search: fileName });
+
+            if (!listError && files && files.some(f => f.name === fileName)) {
+                console.info(`[COMBO_CACHE] Hit for ${ebook.title}`);
+                return cacheKey;
+            }
+            console.info(`[COMBO_CACHE] Miss for ${ebook.title}, merging...`);
         } catch {
             // Not found, proceed to merge
             console.info(`[COMBO_CACHE] Miss for ${ebook.title}, merging...`);
@@ -72,12 +74,17 @@ export async function cacheComboPdf(ebookId: string): Promise<string | null> {
         const mergedBuffer = await mergePDFs(pdfBuffers);
 
         // 4. Upload to Cache
-        await s3Client.send(new PutObjectCommand({
-            Bucket: bucketName,
-            Key: cacheKey,
-            Body: mergedBuffer,
-            ContentType: "application/pdf",
-        }));
+        const { error: uploadError } = await supabase.storage
+            .from(bucketName)
+            .upload(cacheKey, mergedBuffer, {
+                contentType: "application/pdf",
+                upsert: true,
+            });
+
+        if (uploadError) {
+            console.error("[COMBO_CACHE_UPLOAD_ERROR]", uploadError);
+            throw uploadError;
+        }
 
         console.info(`[COMBO_CACHE] Created and uploaded ${cacheKey}`);
         return cacheKey;

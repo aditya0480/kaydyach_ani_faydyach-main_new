@@ -1,19 +1,27 @@
-import { S3Client, PutObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3";
-import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
-import { getSignedUrl as getCloudFrontUrl } from "@aws-sdk/cloudfront-signer";
+import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import crypto from "crypto";
+import ws from "ws";
 
-// Initialize S3 client
-export const s3Client = new S3Client({
-  region: process.env.AWS_REGION || "ap-south-1",
-  credentials: {
-    accessKeyId: process.env.AWS_ACCESS_KEY_ID || "",
-    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || "",
+if (typeof globalThis.WebSocket === "undefined") {
+  (globalThis as any).WebSocket = ws;
+}
+
+// Initialize Supabase Client for Storage operations
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || "";
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
+
+export const supabase: SupabaseClient = createClient(supabaseUrl, supabaseKey, {
+  auth: {
+    persistSession: false,
   },
 });
 
+function getBucketName(): string {
+  return process.env.SUPABASE_STORAGE_BUCKET || process.env.S3_BUCKET_NAME || "pdfs";
+}
+
 /**
- * Upload file to S3 bucket
+ * Upload public file (e.g. avatars, covers) to Supabase Storage bucket
  * @param file - File buffer to upload
  * @param originalFilename - Original filename (optional, for extension)
  * @returns Public URL of uploaded file
@@ -23,48 +31,38 @@ export async function uploadToS3(
   originalFilename?: string
 ): Promise<string> {
   try {
-    // Generate unique filename
     const fileExtension = originalFilename
       ? originalFilename.split(".").pop()
       : "jpg";
     const uniqueFilename = `avatars/${crypto.randomUUID()}.${fileExtension}`;
+    const bucketName = getBucketName();
+    const contentType = fileExtension === "pdf" ? "application/pdf" : `image/${fileExtension}`;
 
-    const bucketName = process.env.S3_BUCKET_NAME;
-    if (!bucketName) {
-      throw new Error("S3_BUCKET_NAME environment variable is not set");
+    const { error } = await supabase.storage
+      .from(bucketName)
+      .upload(uniqueFilename, file, {
+        contentType,
+        upsert: true,
+      });
+
+    if (error) {
+      console.error("Error uploading to Supabase Storage:", error);
+      throw new Error(`Failed to upload file to Supabase: ${error.message}`);
     }
 
-    // Upload to S3
-    const command = new PutObjectCommand({
-      Bucket: bucketName,
-      Key: uniqueFilename,
-      Body: file,
-      ContentType: `image/${fileExtension}`,
-    });
-
-    await s3Client.send(command);
-
-    // Return CloudFront URL instead of direct S3 URL
-    const domain = process.env.CLOUDFRONT_DOMAIN;
-    if (domain) {
-      return `https://${domain}/${uniqueFilename}`;
-    }
-
-    // Fallback to public S3 URL if CloudFront is not set
-    const publicUrl = `https://${bucketName}.s3.${process.env.AWS_REGION || "ap-south-1"}.amazonaws.com/${uniqueFilename}`;
-
-    return publicUrl;
+    const { data } = supabase.storage.from(bucketName).getPublicUrl(uniqueFilename);
+    return data.publicUrl;
   } catch (error) {
-    console.error("Error uploading to S3:", error);
-    throw new Error("Failed to upload file to S3");
+    console.error("Error uploading to Supabase Storage:", error);
+    throw new Error("Failed to upload file to Supabase Storage");
   }
 }
 
 /**
- * Upload private file to S3 bucket (for Ebooks)
+ * Upload payment screenshot to Supabase Storage bucket
  * @param file - File buffer
- * @param originalFilename - Original filename
- * @returns S3 Key
+ * @param contentType - Content type of file
+ * @returns Storage Key
  */
 export async function uploadPaymentScreenshot(
   file: Buffer,
@@ -72,167 +70,190 @@ export async function uploadPaymentScreenshot(
 ): Promise<string> {
   const ext = contentType.split("/")[1] || "jpg";
   const uniqueKey = `payment-screenshots/${crypto.randomUUID()}.${ext}`;
-  const bucketName = process.env.S3_BUCKET_NAME;
-  if (!bucketName) throw new Error("S3_BUCKET_NAME not set");
+  const bucketName = getBucketName();
 
-  const command = new PutObjectCommand({
-    Bucket: bucketName,
-    Key: uniqueKey,
-    Body: file,
-    ContentType: contentType,
-  });
+  const { error } = await supabase.storage
+    .from(bucketName)
+    .upload(uniqueKey, file, {
+      contentType,
+      upsert: true,
+    });
 
-  await s3Client.send(command);
+  if (error) {
+    console.error("Error uploading payment screenshot to Supabase Storage:", error);
+    throw new Error(`Failed to upload payment screenshot: ${error.message}`);
+  }
+
   return uniqueKey;
 }
 
+/**
+ * Upload private file to Supabase Storage bucket (for Ebooks)
+ * @param file - File buffer
+ * @param originalFilename - Original filename
+ * @returns Storage Key
+ */
 export async function uploadPrivateFile(
   file: Buffer,
   originalFilename: string
 ): Promise<string> {
   const fileExtension = originalFilename.split(".").pop();
   const uniqueKey = `ebooks/${crypto.randomUUID()}.${fileExtension}`;
-  const bucketName = process.env.S3_BUCKET_NAME;
+  const bucketName = getBucketName();
 
-  if (!bucketName) throw new Error("S3_BUCKET_NAME not set");
+  const { error } = await supabase.storage
+    .from(bucketName)
+    .upload(uniqueKey, file, {
+      contentType: "application/pdf",
+      upsert: true,
+    });
 
-  const command = new PutObjectCommand({
-    Bucket: bucketName,
-    Key: uniqueKey,
-    Body: file,
-    ContentType: "application/pdf", // Assuming PDF mostly
-    // ACL is not set, so it relies on bucket policy (should be private by default)
-  });
+  if (error) {
+    console.error("Error uploading private file to Supabase Storage:", error);
+    throw new Error(`Failed to upload private file: ${error.message}`);
+  }
 
-  await s3Client.send(command);
   return uniqueKey;
 }
 
 /**
- * Generate presigned URL for direct-from-browser upload (PUT).
- * Caller PUTs the file body to this URL with the same Content-Type.
+ * Generate presigned URL for direct-from-browser upload.
  */
 export async function getUploadPresignedUrl(
   key: string,
   contentType: string,
-  expiresIn = 600
+  _expiresIn = 600
 ): Promise<string> {
-  const bucketName = process.env.S3_BUCKET_NAME;
-  if (!bucketName) throw new Error("S3_BUCKET_NAME not set");
+  const bucketName = getBucketName();
 
-  const command = new PutObjectCommand({
-    Bucket: bucketName,
-    Key: key,
-    ContentType: contentType,
-  });
+  const { data, error } = await supabase.storage
+    .from(bucketName)
+    .createSignedUploadUrl(key);
 
-  return getSignedUrl(s3Client, command, { expiresIn });
+  if (error || !data) {
+    console.error("Error creating signed upload URL:", error);
+    throw new Error(`Failed to create signed upload URL: ${error?.message || "Unknown error"}`);
+  }
+
+  return data.signedUrl;
 }
 
 /**
- * Build public URL (CloudFront if configured, else direct S3) for a key.
+ * Build public URL for a key in Supabase Storage.
  */
 export function getPublicUrlForKey(key: string): string {
-  const domain = process.env.CLOUDFRONT_DOMAIN;
-  if (domain) return `https://${domain}/${key}`;
-  const bucketName = process.env.S3_BUCKET_NAME;
-  const region = process.env.AWS_REGION || "ap-south-1";
-  return `https://${bucketName}.s3.${region}.amazonaws.com/${key}`;
+  const bucketName = getBucketName();
+  const { data } = supabase.storage.from(bucketName).getPublicUrl(key);
+  return data.publicUrl;
 }
 
 /**
- * Generate CloudFront Signed URL for private file
- * @param key - S3 Key
+ * Generate signed URL for private file (compatibility wrapper for CloudFront signed URL)
+ * @param key - Storage Key
  * @param expiresIn - Expiry in seconds (default 3600 = 1 hour)
  */
 export async function getCloudFrontSignedUrl(
   key: string,
   expiresIn = 3600
 ): Promise<string> {
-  const domain = process.env.CLOUDFRONT_DOMAIN;
-  const keyPairId = process.env.CLOUDFRONT_PUBLIC_KEY_ID;
-  const privateKey = process.env.CLOUDFRONT_PRIVATE_KEY;
-
-  if (!domain) throw new Error("CLOUDFRONT_DOMAIN not set");
-
-  // Fallback to S3 presigned URL if keys are missing
-  if (!keyPairId || !privateKey) {
-    console.warn("[S3_UTIL] CloudFront keys missing, falling back to S3 Presigned URL");
-    return getPresignedUrl(key, expiresIn);
-  }
-
-  // Encode the key to handle spaces and special characters (Marathi)
-  const encodedKey = key.split('/').map(segment => encodeURIComponent(segment)).join('/');
-  const url = `https://${domain}/${encodedKey}`;
-  const dateLessThan = new Date(Date.now() + expiresIn * 1000).toISOString();
-
-  try {
-    return getCloudFrontUrl({
-      url,
-      keyPairId,
-      privateKey: privateKey.replace(/\\n/g, '\n'),
-      dateLessThan,
-    });
-  } catch (error) {
-    console.error("[S3_UTIL] CloudFront Signing Failed:", error);
-    return getPresignedUrl(key, expiresIn);
-  }
+  return getPresignedUrl(key, expiresIn);
 }
 
 /**
- * Generate presigned URL for private file
- * @param key - S3 Key
+ * Generate presigned/signed URL for private file download
+ * @param key - Storage Key
  * @param expiresIn - Expiry in seconds (default 3600 = 1 hour)
- * @param responseContentDisposition - Optional Content-Disposition header (for filename)
+ * @param responseContentDisposition - Optional Content-Disposition header
  * @param responseContentType - Optional Content-Type header
  */
 export async function getPresignedUrl(
   key: string,
   expiresIn = 3600,
   responseContentDisposition?: string,
-  responseContentType?: string
+  _responseContentType?: string
 ): Promise<string> {
-  const bucketName = process.env.S3_BUCKET_NAME;
-  if (!bucketName) throw new Error("S3_BUCKET_NAME not set");
+  const bucketName = getBucketName();
 
-  const command = new GetObjectCommand({
-    Bucket: bucketName,
-    Key: key,
-    ResponseContentDisposition: responseContentDisposition,
-    ResponseContentType: responseContentType,
-  });
+  let downloadOption: boolean | string | undefined = undefined;
+  if (responseContentDisposition) {
+    const match = responseContentDisposition.match(/filename="([^"]+)"/);
+    if (match && match[1]) {
+      downloadOption = match[1];
+    } else {
+      downloadOption = true;
+    }
+  }
 
-  return getSignedUrl(s3Client, command, { expiresIn });
+  const tryGetUrl = async (targetKey: string) => {
+    return await supabase.storage
+      .from(bucketName)
+      .createSignedUrl(
+        targetKey,
+        expiresIn,
+        downloadOption !== undefined ? { download: downloadOption } : undefined
+      );
+  };
+
+  // Primary attempt
+  let { data, error } = await tryGetUrl(key);
+
+  // If object not found, attempt fallback key path (e.g. without 'ebooks/' prefix or with 'ebooks/' prefix)
+  if (error && (error as any).statusCode === '404') {
+    const fallbackKey = key.startsWith("ebooks/")
+      ? key.replace(/^ebooks\//, "")
+      : `ebooks/${key}`;
+
+    const fallbackResult = await tryGetUrl(fallbackKey);
+    if (!fallbackResult.error && fallbackResult.data) {
+      data = fallbackResult.data;
+      error = null;
+    }
+  }
+
+  if (error || !data) {
+    console.error("Error creating signed download URL from Supabase:", error);
+    throw new Error(`Failed to generate presigned URL: ${error?.message || "Unknown error"}`);
+  }
+
+  return data.signedUrl;
 }
 
 /**
- * Fetch PDF file from S3 as Buffer (for watermarking)
- * @param key - S3 Key
+ * Fetch PDF file from Supabase Storage as Buffer (for watermarking / merging)
+ * @param key - Storage Key
  * @returns PDF as Buffer
  */
 export async function fetchPdfBuffer(key: string): Promise<Buffer> {
-  const bucketName = process.env.S3_BUCKET_NAME;
-  if (!bucketName) throw new Error("S3_BUCKET_NAME not set");
+  const bucketName = getBucketName();
 
-  const command = new GetObjectCommand({
-    Bucket: bucketName,
-    Key: key,
-  });
+  let { data, error } = await supabase.storage
+    .from(bucketName)
+    .download(key);
 
-  const response = await s3Client.send(command);
+  // Fallback for key location (root vs ebooks/ folder)
+  if (error && (error as any).statusCode === '404') {
+    const fallbackKey = key.startsWith("ebooks/")
+      ? key.replace(/^ebooks\//, "")
+      : `ebooks/${key}`;
 
-  if (!response.Body) {
-    throw new Error("No PDF body in S3 response");
+    const fallbackResult = await supabase.storage
+      .from(bucketName)
+      .download(fallbackKey);
+
+    if (!fallbackResult.error && fallbackResult.data) {
+      data = fallbackResult.data;
+      error = null;
+    }
   }
 
-  // Convert stream to buffer
-  const chunks: Uint8Array[] = [];
-  for await (const chunk of response.Body as AsyncIterable<Uint8Array>) {
-    chunks.push(chunk);
+  if (error || !data) {
+    console.error("Error downloading file from Supabase Storage:", error);
+    throw new Error(`Failed to fetch PDF buffer: ${error?.message || "File not found"}`);
   }
 
-  const buffer = Buffer.concat(chunks);
-  return buffer;
+  const arrayBuffer = await data.arrayBuffer();
+  return Buffer.from(arrayBuffer);
 }
+
 
 
