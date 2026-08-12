@@ -1,0 +1,29 @@
+{
+  "dir": "./",
+  "ignore": {
+    "routes": ["/api/cron/**", "/api/webhooks/**"],
+    "folders": [
+      "**/node_modules/**",
+      "**/dist/**",
+      "**/.next/**",
+      "**/out/**",
+      "**/build/**",
+      "**/.git/**",
+      "**/coverage/**",
+      "**/lib/generated/**",
+      "**/load-tests/**"
+    ],
+    "files": [
+      "prisma/seed.ts",
+      "public/google9b53e5fcc732379c.html"
+    ]
+  },
+  "extensions": [
+    ".ts",
+    ".tsx",
+    ".js",
+    ".jsx"
+  ],
+  "nestGlobalPrefix": "",
+  "extraRoutePatterns": []
+}

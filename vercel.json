@@ -1,0 +1,15 @@
+{
+  "git": {
+    "deploymentEnabled": false
+  },
+  "crons": [
+    {
+      "path": "/api/cron/payment-reminder",
+      "schedule": "0,30 * * * *"
+    },
+    {
+      "path": "/api/cron/retry-whatsapp",
+      "schedule": "0 */2 * * *"
+    }
+  ]
+}

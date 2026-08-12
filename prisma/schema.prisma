@@ -1,0 +1,350 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client"
+  output   = "../lib/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("NEXT_POSTGRES_URL")
+}
+
+// ============================================
+// AUTH MODELS (NextAuth.js)
+// ============================================
+
+model User {
+  id                String             @id @default(cuid())
+  name              String?
+  email             String?            @unique
+  emailVerified     DateTime?
+  image             String?
+  password          String? // Nullable for OAuth users
+  role              String             @default("USER")
+  isVerified        Boolean            @default(false)
+  accounts          Account[]
+  sessions          Session[]
+  pushSubscriptions PushSubscription[]
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+
+  @@index([role])
+  @@index([createdAt])
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// ============================================
+// YOUR APP MODELS (Add your models below)
+// ============================================
+
+model OTP {
+  id        String   @id @default(cuid())
+  email     String
+  code      String
+  expiresAt DateTime
+  verified  Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([email])
+}
+
+model PasswordResetToken {
+  id        String   @id @default(cuid())
+  email     String
+  token     String   @unique
+  expiresAt DateTime
+  used      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([email])
+  @@index([token])
+}
+
+model RateLimit {
+  id         String   @id @default(cuid())
+  identifier String // email or IP
+  action     String // "resend-otp" or "forgot-password"
+  count      Int      @default(1)
+  resetAt    DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([identifier, action])
+  @@index([identifier, action])
+}
+
+model PushSubscription {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  endpoint  String   @db.Text
+  p256dh    String
+  auth      String
+  userAgent String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, endpoint])
+  @@index([userId])
+}
+
+// E-commerce Models
+
+model Ebook {
+  id           String   @id @default(cuid())
+  displayId    Int      @unique @default(autoincrement())
+  shortCode    String?  @unique // Permanent short URL code (e.g., /d/abc123)
+  title        String
+  description  String   @db.Text
+  price        Float
+  pages        Int?     @default(0)
+  coverImage   String?
+  fileUrl      String // Private S3 URL
+  previewUrl   String? // Public preview URL (first few pages)
+  category     String?
+  isEnabled    Boolean  @default(true)
+  sampleImages String[] @default([])
+
+  // Combo Package Fields
+  isCombo        Boolean     @default(false)
+  includedEbooks ComboItem[] @relation("ComboParent")
+  includedIn     ComboItem[] @relation("ComboChild")
+  comboOrder     String[]    @default([])
+
+  language  Language  @default(MARATHI)
+
+  orderItems OrderItem[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([shortCode])
+  @@index([isEnabled])
+  @@index([isCombo])
+  @@index([category])
+  @@index([language])
+  @@index([createdAt])
+}
+
+enum Language {
+  MARATHI
+  HINDI
+  ENGLISH
+}
+
+enum OrderStatus {
+  PENDING
+  PENDING_VERIFICATION
+  PAID
+  FAILED
+  CANCELLED
+}
+
+enum ManualPaymentStatus {
+  PENDING
+  AUTO_APPROVED
+  AUTO_REJECTED
+  ADMIN_APPROVED
+  ADMIN_REJECTED
+}
+
+enum AdPlatform {
+  META
+  GOOGLE
+  OTHER
+}
+
+// Daily ad spend for ROAS / ad-performance tracking. One row per platform per IST day.
+model AdSpend {
+  id          String     @id @default(cuid())
+  date        DateTime
+  platform    AdPlatform @default(META)
+  amount      Float
+  campaign    String?
+  clicks      Int?
+  impressions Int?
+  notes       String?
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  @@unique([date, platform])
+  @@index([date])
+  @@map("ad_spend")
+}
+
+// Per-ebook, per-day Meta ad spend for the Daily Analytics ROAS/profit tracker.
+model EbookAdSpend {
+  id        String   @id @default(cuid())
+  date      DateTime
+  ebookId   String
+  metaSpend Float    @default(0)
+  enteredOn DateTime @default(now())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([date, ebookId])
+  @@index([date])
+  @@index([ebookId])
+  @@map("ebook_ad_spend")
+}
+
+model Order {
+  id             String      @id @default(cuid())
+  customerName   String?
+  customerEmail  String?
+  customerPhone  String?
+  amount         Float
+  status         OrderStatus @default(PENDING)
+  failureReason  String?
+  whatsappSentAt DateTime?
+
+  razorpayOrderId        String? @unique
+  razorpayPaymentId      String? @unique
+  razorpayPaymentLinkId  String? @unique
+
+  // Manual UPI payment fields
+  manualUtr               String?              @unique
+  manualScreenshotKey     String?
+  manualScreenshotHash    String?              @unique
+  manualPayerName         String?
+  manualReceiverName      String?
+  manualReceiverUpiId     String?
+  manualPaidAt            DateTime?
+  manualSubmittedAt       DateTime?
+  manualVerifiedAt        DateTime?
+  manualVerifiedBy        String?
+  manualStatus            ManualPaymentStatus?
+  manualConfidence        Float?
+  manualRejectionReason   String?
+  manualGeminiRaw         Json?
+
+  items OrderItem[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([customerEmail])
+  @@index([customerPhone])
+  @@index([razorpayOrderId])
+  @@index([status])
+  @@index([createdAt])
+  @@index([manualStatus])
+}
+
+model OrderItem {
+  id      String @id @default(cuid())
+  orderId String
+  order   Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  ebookId String
+  ebook   Ebook  @relation(fields: [ebookId], references: [id])
+  price   Float // Snapshot price at time of purchase
+
+  @@unique([orderId, ebookId])
+  @@index([ebookId])
+}
+
+model Lead {
+  id        String   @id @default(cuid())
+  email     String
+  name      String?
+  resource  String? // Title of the resource they requested
+  createdAt DateTime @default(now())
+
+  @@index([email])
+}
+
+model ShortLink {
+  id        String    @id @default(cuid())
+  shortCode String    @unique // The 8-character ID
+  url       String    @db.Text // The original long URL
+  createdAt DateTime  @default(now())
+  expiresAt DateTime?
+
+  @@index([shortCode])
+}
+
+model OrderLog {
+  id        String   @id @default(cuid())
+  orderId   String?  // nullable — some client events fire before order is saved
+  event     String   // e.g. ORDER_CREATED, MODAL_DISMISSED, PAYMENT_FAILED, ORDER_FULFILLED
+  source    String   // "server" | "callback" | "webhook" | "verify" | "client"
+  metadata  Json?    // any extra context (error codes, razorpay ids, device info)
+  createdAt DateTime @default(now())
+
+  @@index([orderId])
+  @@index([event])
+  @@index([createdAt])
+}
+
+model ConsultationConfig {
+  id    Int   @id @default(1)
+  price Float @default(99)
+
+  updatedAt DateTime @updatedAt
+}
+
+model ConsultationBooking {
+  id                String      @id @default(cuid())
+  name              String
+  mobile            String
+  category          String
+  description       String?
+  amount            Float       @default(99)
+  status            OrderStatus @default(PENDING)
+  razorpayOrderId   String?     @unique
+  razorpayPaymentId String?     @unique
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+
+  @@index([status])
+  @@index([createdAt])
+  @@index([mobile])
+}
+
+model ComboItem {
+  comboId String
+  ebookId String
+  combo   Ebook @relation("ComboParent", fields: [comboId], references: [id], onDelete: Cascade)
+  ebook   Ebook @relation("ComboChild", fields: [ebookId], references: [id], onDelete: Cascade)
+
+  @@id([comboId, ebookId])
+}
