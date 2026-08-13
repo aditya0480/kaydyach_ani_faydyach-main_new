@@ -11,6 +11,9 @@ export const CACHE_TAGS = {
 } as const;
 
 function resolveEbookCover(ebook: { id: string; coverImage: string | null }): string {
+    if (ebook.coverImage && ebook.coverImage.length > 0 && !ebook.coverImage.startsWith("/api/cover/")) {
+        return ebook.coverImage;
+    }
     return `/api/cover/${ebook.id}`;
 }
 
