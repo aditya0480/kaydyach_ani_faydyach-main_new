@@ -177,7 +177,7 @@ export function AdPerformanceClient({
               <YAxis yAxisId="roas" orientation="right" tick={{ fontSize: 10 }} axisLine={false} tickLine={false} width={32} />
               <Tooltip
                 labelFormatter={(d) => format(parseISO(String(d)), "dd MMM yyyy")}
-                formatter={(v?: number, name?: string) => {
+                formatter={(v: any, name: any) => {
                   if (name === "ROAS") return [v == null ? "—" : `${v}x`, "ROAS"];
                   return [`₹${(v ?? 0).toLocaleString("en-IN")}`, name];
                 }}

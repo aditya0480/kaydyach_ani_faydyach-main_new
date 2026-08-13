@@ -15,8 +15,7 @@ const createPrismaClient = () => {
       console.warn("⚠️ Missing DATABASE_URL environment variable. Prisma might fail if queried.");
     }
     // Return standard client without pg adapter if during build or no DB string
-    // @ts-expect-error - Fallback PrismaClient instantiation without adapter
-    return new PrismaClient({ adapter: null });
+    return new PrismaClient({ adapter: null } as any);
   }
 
   const pool = new Pool({

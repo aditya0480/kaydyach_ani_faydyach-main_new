@@ -125,7 +125,7 @@ export function SalesAnalyticsClient({ data }: { data: BookwiseSales }) {
                 <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" horizontal={false} />
                 <XAxis type="number" tick={{ fontSize: 10 }} axisLine={false} tickLine={false} />
                 <YAxis type="category" dataKey="label" tick={{ fontSize: 11 }} axisLine={false} tickLine={false} width={140} />
-                <Tooltip formatter={(v?: number) => [`₹${(v ?? 0).toLocaleString("en-IN")}`, "Revenue"]} cursor={{ fill: "#f9fafb" }} />
+                <Tooltip formatter={(v: any) => [`₹${(v ?? 0).toLocaleString("en-IN")}`, "Revenue"]} cursor={{ fill: "#f9fafb" }} />
                 <Bar dataKey="revenue" fill={BRAND} radius={[0, 4, 4, 0]} maxBarSize={26} />
               </BarChart>
             </ResponsiveContainer>
@@ -150,7 +150,7 @@ export function SalesAnalyticsClient({ data }: { data: BookwiseSales }) {
               <YAxis tick={{ fontSize: 10 }} axisLine={false} tickLine={false} width={48} />
               <Tooltip
                 labelFormatter={(d) => format(parseISO(String(d)), "dd MMM yyyy")}
-                formatter={(v?: number) => [`₹${(v ?? 0).toLocaleString("en-IN")}`, "Revenue"]}
+                formatter={(v: any) => [`₹${(v ?? 0).toLocaleString("en-IN")}`, "Revenue"]}
               />
               <Area type="monotone" dataKey="revenue" stroke={GOLD} strokeWidth={2} fill="url(#rev)" />
             </AreaChart>
@@ -229,7 +229,7 @@ export function SalesAnalyticsClient({ data }: { data: BookwiseSales }) {
                 <YAxis tick={{ fontSize: 10 }} axisLine={false} tickLine={false} width={48} />
                 <Tooltip
                   labelFormatter={(d) => format(parseISO(String(d)), "dd MMM yyyy")}
-                  formatter={(v?: number) => [`₹${(v ?? 0).toLocaleString("en-IN")}`, "Revenue"]}
+                  formatter={(v: any) => [`₹${(v ?? 0).toLocaleString("en-IN")}`, "Revenue"]}
                 />
                 <Area type="monotone" dataKey="revenue" stroke={BRAND} strokeWidth={2} fill="url(#bookrev)" />
               </AreaChart>
