@@ -20,12 +20,9 @@ const createPrismaClient = () => {
 
   const pool = new Pool({
     connectionString,
-    // Enforce SSL for Neon (Strict), Disable for Localhost, Lenient for others in Prod
-    ssl: connectionString.includes("neon.tech")
-      ? { rejectUnauthorized: true }
-      : (connectionString.includes("localhost") || connectionString.includes("127.0.0.1"))
-        ? undefined
-        : (process.env.NODE_ENV === "production" ? { rejectUnauthorized: false } : undefined),
+    ssl: (connectionString.includes("localhost") || connectionString.includes("127.0.0.1"))
+      ? undefined
+      : { rejectUnauthorized: false },
     max: process.env.NODE_ENV === "production" ? 5 : 1, // Reduced from 10 to 5 - sufficient for serverless
     min: 0, // Allow pool to scale down to 0 when idle
     idleTimeoutMillis: process.env.NODE_ENV === "production" ? 20000 : 2000, // Faster idle timeout (20s vs 30s)

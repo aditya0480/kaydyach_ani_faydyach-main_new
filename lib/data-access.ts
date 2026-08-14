@@ -102,8 +102,13 @@ export const getEbookById = cache(async (id: string) => {
     return unstable_cache(
         async (id: string) => {
             try {
-                const ebook = await prisma_db.ebook.findUnique({
-                    where: { id },
+                const ebook = await prisma_db.ebook.findFirst({
+                    where: {
+                        OR: [
+                            { id },
+                            { shortCode: id }
+                        ]
+                    },
                     include: { includedEbooks: { include: { ebook: true } } },
                 });
                 if (!ebook) return null;
