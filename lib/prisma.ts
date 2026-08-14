@@ -29,7 +29,7 @@ const createPrismaClient = () => {
     max: process.env.NODE_ENV === "production" ? 5 : 1, // Reduced from 10 to 5 - sufficient for serverless
     min: 0, // Allow pool to scale down to 0 when idle
     idleTimeoutMillis: process.env.NODE_ENV === "production" ? 20000 : 2000, // Faster idle timeout (20s vs 30s)
-    connectionTimeoutMillis: 10000, // Reduced from 15s to 10s
+    connectionTimeoutMillis: 20000, // 20s for serverless cold-start resilience
     allowExitOnIdle: true,
     maxUses: 7500,
     // Enable statement timeout to prevent long-running queries
