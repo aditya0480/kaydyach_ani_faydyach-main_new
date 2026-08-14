@@ -12,8 +12,9 @@ process.emitWarning = ((warning: string | Error) => {
     _origWarn(warning);
 }) as typeof process.emitWarning;
 
+const razorpayKeyId = process.env.RAZORPAY_KEY_ID || process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || "";
 const razorpay = new Razorpay({
-    key_id: process.env.RAZORPAY_KEY_ID || "",
+    key_id: razorpayKeyId,
     key_secret: process.env.RAZORPAY_KEY_SECRET || "",
 });
 
@@ -89,7 +90,7 @@ export async function POST(req: NextRequest) {
             razorpayOrderId: razorpayOrder.id,
             amount: amountPaise,
             currency: "INR",
-            keyId: process.env.RAZORPAY_KEY_ID,
+            keyId: razorpayKeyId,
         });
     } catch (error) {
         const message = error instanceof Error ? error.message : "Unknown error";
