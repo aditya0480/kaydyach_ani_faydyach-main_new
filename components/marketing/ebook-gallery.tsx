@@ -4,16 +4,22 @@ import React, { useState, useEffect, useCallback } from 'react';
 import useEmblaCarousel from 'embla-carousel-react';
 import Autoplay from 'embla-carousel-autoplay';
 import Image from "next/image";
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
+import { usePdfPages } from '@/hooks/use-pdf-pages';
 
 interface EbookGalleryProps {
     coverImage: string | null;
-    sampleImages: string[];
+    sampleImages?: string[];
     title: string;
+    ebookId?: string;
 }
 
-export function EbookGallery({ coverImage, sampleImages, title }: EbookGalleryProps) {
-    const images = [coverImage, ...sampleImages].filter(Boolean) as string[];
+export function EbookGallery({ coverImage, sampleImages = [], title, ebookId }: EbookGalleryProps) {
+    const { pages: pdfPages, isLoading } = usePdfPages(ebookId, coverImage);
+    
+    // Use PDF rendered pages if available, otherwise fallback to coverImage
+    const images = pdfPages.length > 0 ? pdfPages : (coverImage ? [coverImage] : []);
+    
     const [selectedIndex, setSelectedIndex] = useState(0);
     const [isMobile, setIsMobile] = useState(false);
 
@@ -25,13 +31,9 @@ export function EbookGallery({ coverImage, sampleImages, title }: EbookGalleryPr
     }, []);
 
     const [emblaMainRef, emblaMainApi] = useEmblaCarousel(
-        { loop: true },
-        [Autoplay({ delay: 3000, stopOnInteraction: true })]
+        { loop: images.length > 1 },
+        [Autoplay({ delay: 3500, stopOnInteraction: true })]
     );
-
-
-
-
 
     const onSelect = useCallback(() => {
         if (!emblaMainApi) return;
@@ -44,6 +46,13 @@ export function EbookGallery({ coverImage, sampleImages, title }: EbookGalleryPr
         emblaMainApi.on('select', onSelect);
         emblaMainApi.on('reInit', onSelect);
     }, [emblaMainApi, onSelect]);
+
+    // Re-initialize carousel whenever image count changes
+    useEffect(() => {
+        if (emblaMainApi) {
+            emblaMainApi.reInit();
+        }
+    }, [images.length, emblaMainApi]);
 
     const scrollPrev = useCallback(() => emblaMainApi?.scrollPrev(), [emblaMainApi]);
     const scrollNext = useCallback(() => emblaMainApi?.scrollNext(), [emblaMainApi]);
@@ -87,12 +96,12 @@ export function EbookGallery({ coverImage, sampleImages, title }: EbookGalleryPr
                             >
                                 <Image
                                     src={src}
-                                    alt={`${title} - ${index + 1}`}
+                                    alt={`${title} - Page ${index + 1}`}
                                     fill
                                     unoptimized
                                     sizes="(max-width: 768px) 100vw, 50vw"
                                     priority={index === 0}
-                                    className="object-cover transition-transform duration-500"
+                                    className="object-contain transition-transform duration-500"
                                 />
                             </div>
                         ))}
@@ -101,6 +110,7 @@ export function EbookGallery({ coverImage, sampleImages, title }: EbookGalleryPr
 
                 {/* Navigation Arrows */}
                 <button
+                    type="button"
                     className="absolute top-1/2 left-2 z-10 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full border border-gray-100 bg-white/95 shadow-lg backdrop-blur transition-all hover:bg-white active:scale-90"
                     onClick={(e) => { e.stopPropagation(); scrollPrev(); }}
                     aria-label="Previous image"
@@ -108,13 +118,13 @@ export function EbookGallery({ coverImage, sampleImages, title }: EbookGalleryPr
                     <ChevronLeft className="h-6 w-6 text-brand-teal" />
                 </button>
                 <button
+                    type="button"
                     className="absolute top-1/2 right-2 z-10 flex h-10 w-10 -translate-y-1/2 animate-pulse items-center justify-center rounded-full border border-gray-100 bg-white/95 shadow-lg backdrop-blur transition-all hover:bg-white active:scale-90 md:animate-none"
                     onClick={(e) => { e.stopPropagation(); scrollNext(); }}
                     aria-label="Next image"
                 >
                     <ChevronRight className="h-6 w-6 text-brand-teal" />
                 </button>
-
 
                 {/* Swipe Hint overlay - Mobile only, first slide only */}
                 {isMobile && selectedIndex === 0 && (
@@ -134,35 +144,6 @@ export function EbookGallery({ coverImage, sampleImages, title }: EbookGalleryPr
                     {selectedIndex + 1} / {images.length}
                 </div>
             </div>
-
-            {/* Thumbnails */}
-            {/* <div className="overflow-hidden px-1" ref={emblaThumbsRef}>
-                <div className="flex gap-3">
-                    {images.map((src, index) => (
-                        <button
-                            key={index}
-                            onClick={() => onThumbClick(index)}
-                            className={cn(
-                                "flex-[0_0_20%] min-w-0 aspect-3/4 rounded-lg overflow-hidden border-2 transition-all shrink-0",
-                                index === selectedIndex
-                                    ? "border-brand-teal ring-2 ring-brand-teal/20 scale-105"
-                                    : "border-transparent opacity-60 hover:opacity-100"
-                            )}
-                        >
-                            <Image
-                                src={src}
-                                fill
-                                sizes="20vw"
-                                className="object-cover"
-                                alt={`Thumb ${index + 1}`}
-                            />
-                        </button>
-                    ))}
-                </div>
-            </div> */}
-
         </div>
     );
 }
-
-

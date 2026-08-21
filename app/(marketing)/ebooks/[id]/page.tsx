@@ -338,6 +338,7 @@ export default async function EbookDetailPage(props: { params: Promise<{ id: str
                             coverImage={ebook.coverImage}
                             sampleImages={ebook.sampleImages}
                             title={ebook.title}
+                            ebookId={ebook.id}
                         />
                     </div>
 
@@ -499,13 +500,28 @@ export default async function EbookDetailPage(props: { params: Promise<{ id: str
                             );
                         })()}
 
-                        {/* Preview Section — moved here so it's after description on mobile */}
-                        <div className="mb-4">
-                            <PreviewTrigger targetId="ebook-preview-section" />
-                            <div id="ebook-preview-section">
-                                <EbookPreview previewUrl={ebook.previewUrl} />
+                        {/* Preview Section */}
+                        {((ebook.sampleImages && ebook.sampleImages.length > 0) || ebook.coverImage || ebook.previewUrl) && (
+                            <div className="mb-6">
+                                <PreviewTrigger
+                                    targetId="ebook-preview-section"
+                                    count={[ebook.coverImage, ...(ebook.sampleImages || [])].filter(Boolean).length}
+                                    language={ebook.language}
+                                />
+                                <div id="ebook-preview-section" className="mt-3">
+                                    <EbookPreview
+                                        previewUrl={ebook.previewUrl}
+                                        sampleImages={ebook.sampleImages}
+                                        coverImage={ebook.coverImage}
+                                        title={ebook.title}
+                                        price={finalPrice}
+                                        ebookId={ebook.id}
+                                        totalPages={ebook.pages}
+                                        language={ebook.language}
+                                    />
+                                </div>
                             </div>
-                        </div>
+                        )}
 
                         {/* ===== DESKTOP CTA Card ===== */}
                         <div className="relative mb-6 hidden w-full overflow-hidden rounded-2xl border border-gray-100 bg-white p-5 shadow-lg md:block">
