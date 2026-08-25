@@ -4,31 +4,39 @@ import React from 'react';
 import { BookOpen, Sparkles } from 'lucide-react';
 
 interface PreviewTriggerProps {
-    targetId: string;
+    targetId?: string;
     count?: number;
     language?: string;
+    onClick?: () => void;
+    className?: string;
 }
 
 const TRIGGER_LABELS = {
     MARATHI: {
-        cta: "पहिली ६ पाने मोफत वाचा (Preview)",
+        cta: "पहिली 7 पाने मोफत वाचा (Preview)",
         badge: "Free Sample",
     },
     HINDI: {
-        cta: "पहले ६ पृष्ठ मुफ्त पढ़ें (Preview)",
+        cta: "पहले 7 पृष्ठ मुफ्त पढ़ें (Preview)",
         badge: "Free Sample",
     },
     ENGLISH: {
-        cta: "Read First 6 Pages Free (Preview)",
+        cta: "Read First 7 Pages Free (Preview)",
         badge: "Free Sample",
     },
 } as const;
 
-export function PreviewTrigger({ targetId, count = 6, language = "MARATHI" }: PreviewTriggerProps) {
-    const handleScroll = () => {
-        const previewEl = document.getElementById(targetId);
-        if (previewEl) {
-            previewEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+export function PreviewTrigger({ targetId, count = 7, language = "MARATHI", onClick, className = "" }: PreviewTriggerProps) {
+    const handleClick = () => {
+        if (onClick) {
+            onClick();
+            return;
+        }
+        if (targetId) {
+            const previewEl = document.getElementById(targetId);
+            if (previewEl) {
+                previewEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
         }
     };
 
@@ -39,12 +47,12 @@ export function PreviewTrigger({ targetId, count = 6, language = "MARATHI" }: Pr
 
     return (
         <div
-            className="group/preview cursor-pointer pt-2"
-            onClick={handleScroll}
+            className={`group/preview cursor-pointer ${className}`}
+            onClick={handleClick}
         >
-            <div className="inline-flex items-center gap-2 rounded-xl border border-brand-gold/30 bg-amber-50/80 px-3 py-1.5 shadow-xs transition-all duration-300 hover:border-brand-gold hover:bg-amber-100/90 active:scale-98">
+            <div className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-brand-gold/40 bg-amber-50/90 px-3.5 py-2 shadow-xs transition-all duration-300 hover:border-brand-gold hover:bg-amber-100 hover:shadow-md active:scale-98">
                 <div className="relative flex items-center justify-center">
-                    <div className="absolute inset-0 animate-ping rounded-full bg-brand-gold/30" />
+                    <div className="absolute inset-0 animate-ping rounded-full bg-brand-gold/40" />
                     <BookOpen className="relative z-10 h-4 w-4 text-amber-700" />
                 </div>
                 <span className="text-xs font-black text-amber-950 sm:text-sm">

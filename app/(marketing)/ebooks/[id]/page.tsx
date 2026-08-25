@@ -3,11 +3,9 @@ import type { Metadata } from "next";
 import { Button } from "@/components/ui/button";
 import { BuyButton } from "@/components/buy-button";
 import { ShieldCheck, BookOpen, Download as DownloadIcon, Zap, Mail, Home, ChevronRight } from "lucide-react";
-import { EbookPreview } from "@/components/ebook-preview";
 import { ShareButtons } from "@/components/share-buttons";
 import { RecommendedCarousel } from "./recommended-carousel";
 import { EbookGallery } from "@/components/marketing/ebook-gallery";
-import { PreviewTrigger } from "@/components/marketing/preview-trigger";
 import { PixelViewContent } from "./_components/pixel-view-content";
 import { DescriptionToggle } from "./_components/description-toggle";
 import { ScrollToTop } from "./_components/scroll-to-top";
@@ -339,6 +337,10 @@ export default async function EbookDetailPage(props: { params: Promise<{ id: str
                             sampleImages={ebook.sampleImages}
                             title={ebook.title}
                             ebookId={ebook.id}
+                            price={finalPrice}
+                            language={ebook.language}
+                            totalPages={ebook.pages}
+                            previewUrl={ebook.previewUrl}
                         />
                     </div>
 
@@ -500,28 +502,6 @@ export default async function EbookDetailPage(props: { params: Promise<{ id: str
                             );
                         })()}
 
-                        {/* Preview Section */}
-                        {((ebook.sampleImages && ebook.sampleImages.length > 0) || ebook.coverImage || ebook.previewUrl) && (
-                            <div className="mb-6">
-                                <PreviewTrigger
-                                    targetId="ebook-preview-section"
-                                    count={[ebook.coverImage, ...(ebook.sampleImages || [])].filter(Boolean).length}
-                                    language={ebook.language}
-                                />
-                                <div id="ebook-preview-section" className="mt-3">
-                                    <EbookPreview
-                                        previewUrl={ebook.previewUrl}
-                                        sampleImages={ebook.sampleImages}
-                                        coverImage={ebook.coverImage}
-                                        title={ebook.title}
-                                        price={finalPrice}
-                                        ebookId={ebook.id}
-                                        totalPages={ebook.pages}
-                                        language={ebook.language}
-                                    />
-                                </div>
-                            </div>
-                        )}
 
                         {/* ===== DESKTOP CTA Card ===== */}
                         <div className="relative mb-6 hidden w-full overflow-hidden rounded-2xl border border-gray-100 bg-white p-5 shadow-lg md:block">
