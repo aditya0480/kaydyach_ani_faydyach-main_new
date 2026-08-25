@@ -3,7 +3,7 @@ import { auth } from "@/lib/auth";
 import { prisma_db } from "@/lib/prisma";
 import { uploadToS3, uploadPrivateFile, fetchPdfBuffer } from "@/lib/s3";
 import { mergePDFs } from "@/lib/pdf-watermark";
-import { revalidateTag } from "next/cache";
+import { revalidateTag, revalidatePath } from "next/cache";
 import { CACHE_TAGS } from "@/lib/data-access";
 
 export const maxDuration = 120;
@@ -194,7 +194,13 @@ export async function PUT(
             });
         }
 
-        revalidateTag(CACHE_TAGS.EBOOKS, "default"); // Force-refresh all cached ebook pages
+        revalidateTag(CACHE_TAGS.EBOOKS, "default");
+        revalidatePath(`/ebooks/${id}`);
+        if (existingEbook.shortCode) {
+            revalidatePath(`/ebooks/${existingEbook.shortCode}`);
+        }
+        revalidatePath("/ebooks");
+        revalidatePath("/dashboard/ebooks");
         return NextResponse.json(ebook);
     } catch (error) {
         console.error("[EBOOKS_PUT]", error);
@@ -226,7 +232,10 @@ export async function DELETE(
                 where: { id },
                 data: { isEnabled: false },
             });
-            revalidateTag(CACHE_TAGS.EBOOKS, "default"); // Force-refresh all cached ebook pages
+            revalidateTag(CACHE_TAGS.EBOOKS, "default");
+            revalidatePath(`/ebooks/${id}`);
+            revalidatePath("/ebooks");
+            revalidatePath("/dashboard/ebooks");
             return NextResponse.json({ ...ebook, message: "Ebook archived because it has existing orders." });
         } else {
             // Get the displayId before deleting
@@ -268,7 +277,10 @@ export async function DELETE(
                 }
             }
 
-            revalidateTag(CACHE_TAGS.EBOOKS, "default"); // Force-refresh all cached ebook pages
+            revalidateTag(CACHE_TAGS.EBOOKS, "default");
+            revalidatePath(`/ebooks/${id}`);
+            revalidatePath("/ebooks");
+            revalidatePath("/dashboard/ebooks");
             return NextResponse.json(ebook);
         }
     } catch (error) {

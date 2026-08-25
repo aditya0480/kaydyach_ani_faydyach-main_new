@@ -94,19 +94,22 @@ export function EbookGallery({
     totalPages,
     previewUrl
 }: EbookGalleryProps) {
-    const { pages: pdfPages, isLoading } = usePdfPages(ebookId, coverImage);
+    const hasSampleImages = Boolean(sampleImages && sampleImages.length > 0);
+    const { pages: pdfPages, isLoading } = usePdfPages(
+        hasSampleImages ? undefined : ebookId,
+        coverImage
+    );
 
-    // Combine PDF rendered pages or fallback to sampleImages / coverImage
-    const pages =
-        pdfPages.length > 0
-            ? pdfPages
-            : sampleImages && sampleImages.length > 0
-            ? coverImage
-                ? [coverImage, ...sampleImages]
-                : sampleImages
-            : coverImage
-            ? [coverImage]
-            : [];
+    // Prioritize sampleImages uploaded in admin dashboard, then PDF pages, then cover
+    const pages = hasSampleImages
+        ? coverImage && !sampleImages.includes(coverImage)
+            ? [coverImage, ...sampleImages]
+            : sampleImages
+        : pdfPages.length > 0
+        ? pdfPages
+        : coverImage
+        ? [coverImage]
+        : [];
 
     const [currentIndex, setCurrentIndex] = useState(0);
     const [isFullscreenOpen, setIsFullscreenOpen] = useState(false);

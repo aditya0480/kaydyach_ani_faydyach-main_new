@@ -120,10 +120,22 @@ export function EbookPreview({
     totalPages,
     language = "MARATHI",
 }: EbookPreviewProps) {
-    const { pages: pdfPages, isLoading } = usePdfPages(ebookId, coverImage);
+    const hasSampleImages = Boolean(sampleImages && sampleImages.length > 0);
+    const { pages: pdfPages, isLoading } = usePdfPages(
+        hasSampleImages ? undefined : ebookId,
+        coverImage
+    );
 
-    // Prefer dynamically rendered PDF pages, then fallback to coverImage
-    const pages = pdfPages.length > 0 ? pdfPages : (coverImage ? [coverImage] : []);
+    // Prefer uploaded sample images, then dynamically rendered PDF pages, then coverImage
+    const pages = hasSampleImages
+        ? coverImage && !sampleImages.includes(coverImage)
+            ? [coverImage, ...sampleImages]
+            : sampleImages
+        : pdfPages.length > 0
+        ? pdfPages
+        : coverImage
+        ? [coverImage]
+        : [];
 
     const [currentIndex, setCurrentIndex] = useState(0);
     const [isFullscreenOpen, setIsFullscreenOpen] = useState(false);
