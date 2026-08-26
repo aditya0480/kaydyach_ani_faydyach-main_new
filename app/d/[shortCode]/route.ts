@@ -12,6 +12,10 @@ export async function GET(
         const params = await context.params;
         const { shortCode } = params;
 
+        if (!shortCode) {
+            return notFound();
+        }
+
         // 1. Check if this is a permanent ebook short code (or fallback: ebook id)
         const ebook = await prisma_db.ebook.findFirst({
             where: { OR: [{ shortCode }, { id: shortCode }] },
@@ -19,15 +23,32 @@ export async function GET(
         });
 
         if (ebook && ebook.fileUrl && ebook.fileUrl !== "COMBO_COLLECTION") {
-            // Generate a fresh CloudFront signed URL (1h expiry) and redirect
-            const signedUrl = await getCloudFrontSignedUrl(ebook.fileUrl, 3600);
-            return NextResponse.redirect(signedUrl, { status: 302 });
+            try {
+                // Generate a fresh signed URL (1h expiry) and redirect
+                const signedUrl = await getCloudFrontSignedUrl(ebook.fileUrl, 3600);
+                return NextResponse.redirect(signedUrl, { status: 302 });
+            } catch (storageErr) {
+                console.error(`[SHORT_LINK_REDIRECT] Storage error for ebook ${shortCode}:`, storageErr);
+            }
         }
 
-        // 2. Fall back to legacy ShortLink table
+        // 2. Fall back to ShortLink table
         const longUrl = await resolveShortLink(shortCode);
         if (!longUrl) {
             return notFound();
+        }
+
+        // Normalize internal URLs: if it points to /api/download, redirect to current host
+        try {
+            const parsed = new URL(longUrl);
+            if (parsed.pathname.startsWith("/api/download") || parsed.pathname.startsWith("/ebooks")) {
+                const targetUrl = new URL(parsed.pathname + parsed.search, req.nextUrl.origin);
+                return NextResponse.redirect(targetUrl, { status: 302 });
+            }
+        } catch {
+            if (longUrl.startsWith("/")) {
+                return NextResponse.redirect(new URL(longUrl, req.nextUrl.origin), { status: 302 });
+            }
         }
 
         return NextResponse.redirect(longUrl, { status: 302 });

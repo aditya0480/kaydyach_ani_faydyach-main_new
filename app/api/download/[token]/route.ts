@@ -196,23 +196,38 @@ export async function GET(
     }
 
     // Fallback: Single File Download Logic (for individual books or specific selection)
-
-    // OPTIMIZATION: Generate CloudFront Signed URL and Redirect
-    // This moves the bandwidth cost to CloudFront Edge and eliminates Vercel Origin Transfer
     if (!targetEbook.fileUrl) {
+      // If no direct fileUrl but it is a combo, try to cache and return merged combo
+      if (targetEbook.isCombo) {
+        const cachedKey = await cacheComboPdf(targetEbook.id);
+        if (cachedKey) {
+          const signedUrl = await getCloudFrontSignedUrl(cachedKey, 3600);
+          return NextResponse.redirect(signedUrl, { status: 307 });
+        }
+      }
       console.error(`[DOWNLOAD] Missing fileUrl for ebook ${targetEbook.id}`);
       return new NextResponse("File not available", { status: 404 });
     }
 
-    console.info('[DOWNLOAD] Redirecting to CloudFront for:', targetEbook.fileUrl);
-
-    const signedUrl = await getCloudFrontSignedUrl(
-      targetEbook.fileUrl,
-      3600 // 1 hour expiry
-    );
-
-    // 307 Temporary Redirect ensures the browser follows the signed URL to CloudFront.
-    return NextResponse.redirect(signedUrl, { status: 307 });
+    try {
+      console.info('[DOWNLOAD] Redirecting to signed URL for:', targetEbook.fileUrl);
+      const signedUrl = await getCloudFrontSignedUrl(
+        targetEbook.fileUrl,
+        3600 // 1 hour expiry
+      );
+      return NextResponse.redirect(signedUrl, { status: 307 });
+    } catch (storageError) {
+      console.error(`[DOWNLOAD] Storage error generating signed URL for ${targetEbook.id}:`, storageError);
+      // If it's a combo, try merging on the fly as backup
+      if (targetEbook.isCombo) {
+        const cachedKey = await cacheComboPdf(targetEbook.id);
+        if (cachedKey) {
+          const signedUrl = await getCloudFrontSignedUrl(cachedKey, 3600);
+          return NextResponse.redirect(signedUrl, { status: 307 });
+        }
+      }
+      return new NextResponse("File temporarily unavailable. Please contact support.", { status: 500 });
+    }
 
   } catch (error) {
     console.error("[DOWNLOAD]", error);
