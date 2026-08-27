@@ -154,9 +154,10 @@ export function getPublicUrlForKey(key: string): string {
  */
 export async function getCloudFrontSignedUrl(
   key: string,
-  expiresIn = 3600
+  expiresIn = 3600,
+  responseContentDisposition?: string
 ): Promise<string> {
-  return getPresignedUrl(key, expiresIn);
+  return getPresignedUrl(key, expiresIn, responseContentDisposition);
 }
 
 /**
@@ -174,13 +175,17 @@ export async function getPresignedUrl(
 ): Promise<string> {
   const bucketName = getBucketName();
 
-  let downloadOption: boolean | string | undefined = undefined;
+  let downloadOption: boolean | string | undefined = true;
   if (responseContentDisposition) {
-    const match = responseContentDisposition.match(/filename="([^"]+)"/);
-    if (match && match[1]) {
-      downloadOption = match[1];
+    if (responseContentDisposition.trim().startsWith("inline")) {
+      downloadOption = undefined;
     } else {
-      downloadOption = true;
+      const match = responseContentDisposition.match(/filename="([^"]+)"/);
+      if (match && match[1]) {
+        downloadOption = match[1];
+      } else {
+        downloadOption = true;
+      }
     }
   }
 

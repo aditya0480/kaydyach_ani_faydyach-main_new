@@ -19,13 +19,16 @@ export async function GET(
         // 1. Check if this is a permanent ebook short code (or fallback: ebook id)
         const ebook = await prisma_db.ebook.findFirst({
             where: { OR: [{ shortCode }, { id: shortCode }] },
-            select: { fileUrl: true },
+            select: { title: true, fileUrl: true },
         });
 
         if (ebook && ebook.fileUrl && ebook.fileUrl !== "COMBO_COLLECTION") {
             try {
+                const openInline = req.nextUrl.searchParams.get("open") === "true";
+                const safeTitle = (ebook.title || "Ebook").replace(/["/\\:;]/g, '').trim();
+                const disposition = openInline ? "inline" : `attachment; filename="${safeTitle.substring(0, 50)}.pdf"`;
                 // Generate a fresh signed URL (1h expiry) and redirect
-                const signedUrl = await getCloudFrontSignedUrl(ebook.fileUrl, 3600);
+                const signedUrl = await getCloudFrontSignedUrl(ebook.fileUrl, 3600, disposition);
                 return NextResponse.redirect(signedUrl, { status: 302 });
             } catch (storageErr) {
                 console.error(`[SHORT_LINK_REDIRECT] Storage error for ebook ${shortCode}:`, storageErr);

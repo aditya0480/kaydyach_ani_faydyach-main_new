@@ -195,13 +195,19 @@ export async function GET(
       }
     }
 
+    const safeTitle = targetEbook.title.replace(/["/\\:;]/g, '').trim();
+    const encodedTitle = encodeURIComponent(safeTitle);
+    const openInline = searchParams.get("open") === "true";
+    const disposition = openInline ? "inline" : "attachment";
+    const contentDisposition = `${disposition}; filename="${safeTitle.substring(0, 50)}.pdf"; filename*=UTF-8''${encodedTitle}.pdf`;
+
     // Fallback: Single File Download Logic (for individual books or specific selection)
     if (!targetEbook.fileUrl) {
       // If no direct fileUrl but it is a combo, try to cache and return merged combo
       if (targetEbook.isCombo) {
         const cachedKey = await cacheComboPdf(targetEbook.id);
         if (cachedKey) {
-          const signedUrl = await getCloudFrontSignedUrl(cachedKey, 3600);
+          const signedUrl = await getCloudFrontSignedUrl(cachedKey, 3600, contentDisposition);
           return NextResponse.redirect(signedUrl, { status: 307 });
         }
       }
@@ -213,7 +219,8 @@ export async function GET(
       console.info('[DOWNLOAD] Redirecting to signed URL for:', targetEbook.fileUrl);
       const signedUrl = await getCloudFrontSignedUrl(
         targetEbook.fileUrl,
-        3600 // 1 hour expiry
+        3600, // 1 hour expiry
+        contentDisposition
       );
       return NextResponse.redirect(signedUrl, { status: 307 });
     } catch (storageError) {
@@ -222,7 +229,7 @@ export async function GET(
       if (targetEbook.isCombo) {
         const cachedKey = await cacheComboPdf(targetEbook.id);
         if (cachedKey) {
-          const signedUrl = await getCloudFrontSignedUrl(cachedKey, 3600);
+          const signedUrl = await getCloudFrontSignedUrl(cachedKey, 3600, contentDisposition);
           return NextResponse.redirect(signedUrl, { status: 307 });
         }
       }
