@@ -23,6 +23,7 @@ import Link from "next/link";
 import { format } from "date-fns";
 import { ComboCarousel } from "./combo-carousel";
 import { DownloadInstructions } from "./_components/download-instructions";
+import { DownloadStartedModal } from "@/components/download-started-modal";
 
 interface Order {
   id: string;
@@ -50,7 +51,24 @@ export default function MyBooksPage() {
     amount: number;
     downloadUrl?: string; // We might need to find this from the fetched orders
   } | null>(null);
+  const [downloadModalData, setDownloadModalData] = useState<{
+    open: boolean;
+    title: string;
+    url: string;
+  }>({
+    open: false,
+    title: "",
+    url: "",
+  });
   const isMobile = useIsMobile();
+
+  const handleStartDownload = (title: string, url: string) => {
+    setDownloadModalData({ open: true, title, url });
+    toast.success("डाउनलोड सुरू झाले आहे! तपासा 'Downloads' फोल्डर.", {
+      icon: "📥",
+      duration: 4000,
+    });
+  };
 
   const performSearch = useCallback(async (searchTerm: string) => {
     if (!searchTerm.trim()) return;
@@ -558,7 +576,7 @@ export default function MyBooksPage() {
                               target="_blank"
                               rel="noopener noreferrer"
                               className="flex items-center justify-center gap-1.5 px-2 sm:px-3"
-                              onClick={() => setShowInstructions(true)}
+                              onClick={() => handleStartDownload(item.title, item.url)}
                             >
                               <span className="text-[10px] font-bold whitespace-nowrap">
                                 डाऊनलोड
@@ -596,6 +614,14 @@ export default function MyBooksPage() {
           
 
         </div>
+
+        {/* Download Started Modal Popup */}
+        <DownloadStartedModal
+          open={downloadModalData.open}
+          onOpenChange={(open) => setDownloadModalData(prev => ({ ...prev, open }))}
+          title={downloadModalData.title}
+          downloadUrl={downloadModalData.url}
+        />
 
         {/* Compact Recommended Combos */}
         <div className="mt-6 mb-2">

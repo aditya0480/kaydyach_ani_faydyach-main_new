@@ -10,8 +10,10 @@ import {
   Library,
 } from "lucide-react";
 import confetti from "canvas-confetti";
-import { useEffect } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
+import { DownloadStartedModal } from "@/components/download-started-modal";
+import { toast } from "sonner";
 
 interface PaymentSuccessProps {
   title: string;
@@ -36,6 +38,16 @@ export function PaymentSuccess({
   customerPhone,
   browserAccessToken,
 }: PaymentSuccessProps) {
+  const [showDownloadModal, setShowDownloadModal] = useState(false);
+
+  const handleDownloadClick = () => {
+    setShowDownloadModal(true);
+    toast.success("डाउनलोड सुरू झाले आहे! तपासा 'Downloads' फोल्डर.", {
+      icon: "📥",
+      duration: 4000,
+    });
+  };
+
   useEffect(() => {
 
     // Store phone number for "My Books" pre-fill
@@ -207,12 +219,21 @@ export function PaymentSuccess({
                 <a
                   href={downloadUrl}
                   download={`${title.replace(/["/\\:;]/g, "").trim()}.pdf`}
+                  onClick={handleDownloadClick}
                   className="flex items-center justify-center gap-2 text-[11px] font-bold"
                 >
                   <BookOpen className="h-4 w-4" /> PDF डाउनलोड करा
                 </a>
               </Button>
             </div>
+
+            {/* Download Started Popup Modal */}
+            <DownloadStartedModal
+              open={showDownloadModal}
+              onOpenChange={setShowDownloadModal}
+              title={title}
+              downloadUrl={downloadUrl}
+            />
 
             {/* Download Hint Box */}
             <div
