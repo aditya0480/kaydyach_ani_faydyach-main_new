@@ -182,7 +182,9 @@ export async function getPresignedUrl(
     } else {
       const match = responseContentDisposition.match(/filename="([^"]+)"/);
       if (match && match[1]) {
-        downloadOption = match[1];
+        // Strip non-ASCII characters so storage provider does not percent-encode the filename
+        const cleanName = match[1].replace(/[^\x20-\x7E]/g, '').trim();
+        downloadOption = cleanName.length > 0 ? cleanName : true;
       } else {
         downloadOption = true;
       }

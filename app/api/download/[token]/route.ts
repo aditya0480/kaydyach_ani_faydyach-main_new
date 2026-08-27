@@ -3,6 +3,7 @@ import { prisma_db } from "@/lib/prisma";
 import jwt from "jsonwebtoken";
 import { fetchPdfBuffer, getPresignedUrl, getCloudFrontSignedUrl } from "@/lib/s3";
 import { mergePDFs } from "@/lib/pdf-watermark";
+import { getSafeDownloadFilename } from "@/lib/ebook-filenames";
 import { cacheComboPdf } from "@/lib/combo-cache";
 
 export async function GET(
@@ -63,6 +64,7 @@ export async function GET(
 
     interface EbookBase {
       id: string;
+      displayId?: number | null;
       title: string;
       fileUrl: string | null;
       isCombo: boolean;
@@ -174,15 +176,14 @@ export async function GET(
         const finalPdfBuffer = await mergePDFs(pdfBuffers);
 
         // 3. Return the merged file
-        const safeTitle = targetEbook.title.replace(/["/\\:;]/g, '').trim();
-        const encodedTitle = encodeURIComponent(safeTitle);
+        const downloadFilename = getSafeDownloadFilename(targetEbook.displayId, targetEbook.title);
         const openInline = searchParams.get("open") === "true";
         const disposition = openInline ? "inline" : "attachment";
 
         return new NextResponse(new Uint8Array(finalPdfBuffer), {
           headers: {
             'Content-Type': 'application/pdf',
-            'Content-Disposition': `${disposition}; filename="Complete_Set.pdf"; filename*=UTF-8''${encodedTitle}_Complete_Set.pdf`,
+            'Content-Disposition': `${disposition}; filename="${downloadFilename}"`,
             'Cache-Control': 'no-store, no-cache, must-revalidate, private',
             'Pragma': 'no-cache',
             'Expires': '0',
@@ -195,11 +196,10 @@ export async function GET(
       }
     }
 
-    const safeTitle = targetEbook.title.replace(/["/\\:;]/g, '').trim();
-    const encodedTitle = encodeURIComponent(safeTitle);
+    const downloadFilename = getSafeDownloadFilename(targetEbook.displayId, targetEbook.title);
     const openInline = searchParams.get("open") === "true";
     const disposition = openInline ? "inline" : "attachment";
-    const contentDisposition = `${disposition}; filename="${safeTitle.substring(0, 50)}.pdf"; filename*=UTF-8''${encodedTitle}.pdf`;
+    const contentDisposition = `${disposition}; filename="${downloadFilename}"`;
 
     // Fallback: Single File Download Logic (for individual books or specific selection)
     if (!targetEbook.fileUrl) {

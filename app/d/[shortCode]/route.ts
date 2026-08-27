@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { resolveShortLink } from "@/lib/short-link";
 import { prisma_db } from "@/lib/prisma";
 import { getCloudFrontSignedUrl } from "@/lib/s3";
+import { getSafeDownloadFilename } from "@/lib/ebook-filenames";
 import { notFound } from "next/navigation";
 
 export async function GET(
@@ -19,14 +20,14 @@ export async function GET(
         // 1. Check if this is a permanent ebook short code (or fallback: ebook id)
         const ebook = await prisma_db.ebook.findFirst({
             where: { OR: [{ shortCode }, { id: shortCode }] },
-            select: { title: true, fileUrl: true },
+            select: { displayId: true, title: true, fileUrl: true },
         });
 
         if (ebook && ebook.fileUrl && ebook.fileUrl !== "COMBO_COLLECTION") {
             try {
                 const openInline = req.nextUrl.searchParams.get("open") === "true";
-                const safeTitle = (ebook.title || "Ebook").replace(/["/\\:;]/g, '').trim();
-                const disposition = openInline ? "inline" : `attachment; filename="${safeTitle.substring(0, 50)}.pdf"`;
+                const downloadFilename = getSafeDownloadFilename(ebook.displayId, ebook.title);
+                const disposition = openInline ? "inline" : `attachment; filename="${downloadFilename}"`;
                 // Generate a fresh signed URL (1h expiry) and redirect
                 const signedUrl = await getCloudFrontSignedUrl(ebook.fileUrl, 3600, disposition);
                 return NextResponse.redirect(signedUrl, { status: 302 });

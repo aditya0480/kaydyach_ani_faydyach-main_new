@@ -13,6 +13,7 @@ import confetti from "canvas-confetti";
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { DownloadStartedModal } from "@/components/download-started-modal";
+import { getSafeDownloadFilename } from "@/lib/ebook-filenames";
 import { toast } from "sonner";
 
 interface PaymentSuccessProps {
@@ -218,7 +219,7 @@ export function PaymentSuccess({
               >
                 <a
                   href={downloadUrl}
-                  download={`${title.replace(/["/\\:;]/g, "").trim()}.pdf`}
+                  download={getSafeDownloadFilename(null, title)}
                   onClick={handleDownloadClick}
                   className="flex items-center justify-center gap-2 text-[11px] font-bold"
                 >
