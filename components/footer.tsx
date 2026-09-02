@@ -68,6 +68,7 @@ export function Footer() {
               <li>
                 <Link
                   href="/"
+                  prefetch={false}
                   className="group flex items-center gap-2 opacity-80 transition-colors hover:text-brand-gold hover:opacity-100"
                   aria-label="Home"
                 >
@@ -78,6 +79,7 @@ export function Footer() {
               <li>
                 <Link
                   href="/ebooks"
+                  prefetch={false}
                   className="group flex items-center gap-2 opacity-80 transition-colors hover:text-brand-gold hover:opacity-100"
                   aria-label="E-books"
                 >
@@ -88,6 +90,7 @@ export function Footer() {
               <li>
                 <Link
                   href="/about"
+                  prefetch={false}
                   className="group flex items-center gap-2 opacity-80 transition-colors hover:text-brand-gold hover:opacity-100"
                   aria-label="About Us"
                 >
@@ -98,6 +101,7 @@ export function Footer() {
               <li>
                 <Link
                   href="/contact"
+                  prefetch={false}
                   className="group flex items-center gap-2 opacity-80 transition-colors hover:text-brand-gold hover:opacity-100"
                   aria-label="Contact Us"
                 >
@@ -108,6 +112,7 @@ export function Footer() {
               <li>
                 <Link
                   href="/dashboard"
+                  prefetch={false}
                   className="group flex items-center gap-2 opacity-80 transition-colors hover:text-brand-gold hover:opacity-100"
                 >
                   <span className="h-1.5 w-1.5 rounded-full bg-brand-gold/50 transition-colors group-hover:bg-brand-gold"></span>
@@ -125,6 +130,7 @@ export function Footer() {
               <li>
                 <Link
                   href="/ebooks"
+                  prefetch={false}
                   className="group flex items-center gap-2 opacity-80 transition-colors hover:text-brand-gold hover:opacity-100"
                 >
                   <span className="h-1.5 w-1.5 rounded-full bg-brand-gold/50 transition-colors group-hover:bg-brand-gold"></span>
@@ -134,6 +140,7 @@ export function Footer() {
               <li>
                 <Link
                   href="/combos"
+                  prefetch={false}
                   className="group flex items-center gap-2 opacity-80 transition-colors hover:text-brand-gold hover:opacity-100"
                 >
                   <span className="h-1.5 w-1.5 rounded-full bg-brand-gold/50 transition-colors group-hover:bg-brand-gold"></span>
@@ -143,6 +150,7 @@ export function Footer() {
               <li>
                 <Link
                   href="/ebooks/hindi"
+                  prefetch={false}
                   className="group flex items-center gap-2 opacity-80 transition-colors hover:text-brand-gold hover:opacity-100"
                 >
                   <span className="h-1.5 w-1.5 rounded-full bg-brand-gold/50 transition-colors group-hover:bg-brand-gold"></span>
@@ -152,6 +160,7 @@ export function Footer() {
               <li>
                 <Link
                   href="/ebooks/english"
+                  prefetch={false}
                   className="group flex items-center gap-2 opacity-80 transition-colors hover:text-brand-gold hover:opacity-100"
                 >
                   <span className="h-1.5 w-1.5 rounded-full bg-brand-gold/50 transition-colors group-hover:bg-brand-gold"></span>
@@ -161,6 +170,7 @@ export function Footer() {
               <li>
                 <Link
                   href="/site-index"
+                  prefetch={false}
                   className="group flex items-center gap-2 opacity-80 transition-colors hover:text-brand-gold hover:opacity-100"
                 >
                   <span className="h-1.5 w-1.5 rounded-full bg-brand-gold/50 transition-colors group-hover:bg-brand-gold"></span>
@@ -260,42 +270,49 @@ export function Footer() {
           <div className="flex flex-wrap justify-center gap-4 text-xs opacity-60 md:justify-end md:gap-6 md:text-sm">
             <Link
               href="/contact"
+              prefetch={false}
               className="transition-colors hover:text-brand-gold"
             >
               Contact
             </Link>
             <Link
               href="/privacy-policy"
+              prefetch={false}
               className="transition-colors hover:text-brand-gold"
             >
               Privacy Policy
             </Link>
             <Link
               href="/data-deletion"
+              prefetch={false}
               className="transition-colors hover:text-brand-gold"
             >
               Data Deletion
             </Link>
             <Link
               href="/terms"
+              prefetch={false}
               className="transition-colors hover:text-brand-gold"
             >
               Terms
             </Link>
             <Link
               href="/refund-policy"
+              prefetch={false}
               className="transition-colors hover:text-brand-gold"
             >
               Refunds
             </Link>
             <Link
               href="/cancellation-policy"
+              prefetch={false}
               className="transition-colors hover:text-brand-gold"
             >
               Cancellation
             </Link>
             <Link
               href="/shipping-policy"
+              prefetch={false}
               className="transition-colors hover:text-brand-gold"
             >
               Delivery

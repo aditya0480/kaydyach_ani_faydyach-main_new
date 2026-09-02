@@ -85,6 +85,7 @@ function ComboCard({ book }: { book: Ebook }) {
     return (
         <Link
             href={`/ebooks/${book.id}`}
+            prefetch={false}
             className="group relative block overflow-hidden rounded-2xl border border-gray-100 bg-white p-3 shadow-sm transition-all active:scale-[0.98]"
         >
             <div className="flex gap-3">

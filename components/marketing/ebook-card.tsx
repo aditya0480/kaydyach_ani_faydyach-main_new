@@ -68,6 +68,7 @@ export function EbookCard({ ebook, searchQuery, className }: EbookCardProps) {
     return (
         <Link
             href={`/ebooks/${ebook.id}`}
+            prefetch={false}
             onClick={() => setIsLoading(true)}
             className={`group relative flex h-full flex-col overflow-hidden rounded-xl border border-gray-100 bg-white shadow-sm transition-shadow duration-300 hover:shadow-lg ${className}`}
         >

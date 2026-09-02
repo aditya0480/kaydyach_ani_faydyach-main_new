@@ -71,7 +71,7 @@ export function CombosSection({ combos }: CombosSectionProps) {
 
                 <div className="mt-12 text-center">
                     <Button asChild variant="outline" size="lg" className="rounded-full border-2 border-brand-teal px-8 text-base font-bold text-brand-teal transition-colors hover:bg-brand-teal hover:text-white">
-                        <Link href="/combos">सर्व कॉम्बो पॅक्स पहा <ArrowRight className="ml-2 h-5 w-5" /></Link>
+                        <Link href="/combos" prefetch={false}>सर्व कॉम्बो पॅक्स पहा <ArrowRight className="ml-2 h-5 w-5" /></Link>
                     </Button>
                 </div>
             </div>

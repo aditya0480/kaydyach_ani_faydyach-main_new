@@ -47,6 +47,7 @@ function RecommendedBookCard({ book }: { book: EbookSummary }) {
     return (
         <Link
             href={`/ebooks/${book.id}`}
+            prefetch={false}
             className="group flex h-full flex-col overflow-hidden rounded-xl border border-gray-100 bg-white shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-xl"
         >
             {/* Book Cover */}

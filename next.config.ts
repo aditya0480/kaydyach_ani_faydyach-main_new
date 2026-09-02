@@ -59,7 +59,17 @@ const nextConfig: NextConfig = {
         ],
       },
       {
-        // Cache static assets aggressively
+        // Cache static assets and public media aggressively
+        source: '/:path*\\.(?:ico|png|jpg|jpeg|svg|webp|avif|woff|woff2|ttf|eot|webmanifest)',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'public, max-age=31536000, immutable',
+          },
+        ],
+      },
+      {
+        // Cache favicon folder if any
         source: '/favicon/:path*',
         headers: [
           {
