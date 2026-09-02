@@ -60,7 +60,7 @@ const nextConfig: NextConfig = {
       },
       {
         // Cache static assets and public media aggressively
-        source: '/:path*\\.(?:ico|png|jpg|jpeg|svg|webp|avif|woff|woff2|ttf|eot|webmanifest)',
+        source: '/:path*.(ico|png|jpg|jpeg|svg|webp|avif|woff|woff2|ttf|eot|webmanifest)',
         headers: [
           {
             key: 'Cache-Control',
