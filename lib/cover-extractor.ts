@@ -59,31 +59,33 @@ export async function getOrGenerateCoverImage(ebookId: string, pdfKey: string): 
   }
 
   const bucketName = getBucketName();
-  const coverKey = `covers/${ebookId}.jpg`;
+  const coverKeys = [`covers/${ebookId}.jpg`, `covers/${ebookId}.png`];
 
   // 1. Check if cover image is already cached in Supabase Storage
-  try {
-    let { data, error } = await supabase.storage.from(bucketName).download(coverKey);
-    if ((error || !data) && supabaseFallback) {
-      const fallbackDownload = await supabaseFallback.storage.from(bucketName).download(coverKey);
-      if (!fallbackDownload.error && fallbackDownload.data) {
-        data = fallbackDownload.data;
-        error = null;
+  for (const coverKey of coverKeys) {
+    try {
+      let { data, error } = await supabase.storage.from(bucketName).download(coverKey);
+      if ((error || !data) && supabaseFallback) {
+        const fallbackDownload = await supabaseFallback.storage.from(bucketName).download(coverKey);
+        if (!fallbackDownload.error && fallbackDownload.data) {
+          data = fallbackDownload.data;
+          error = null;
+        }
       }
+      if (data && !error) {
+        const arrayBuffer = await data.arrayBuffer();
+        const buffer = Buffer.from(arrayBuffer);
+        const isPng = buffer.slice(0, 8).toString("hex") === "89504e470d0a1a0a";
+        const result = {
+          buffer,
+          contentType: isPng ? "image/png" : "image/jpeg",
+        };
+        coverMemoryCache.set(ebookId, result);
+        return result;
+      }
+    } catch {
+      // Try next format
     }
-    if (data && !error) {
-      const arrayBuffer = await data.arrayBuffer();
-      const buffer = Buffer.from(arrayBuffer);
-      const isPng = buffer.slice(0, 8).toString("hex") === "89504e470d0a1a0a";
-      const result = {
-        buffer,
-        contentType: isPng ? "image/png" : "image/jpeg",
-      };
-      coverMemoryCache.set(ebookId, result);
-      return result;
-    }
-  } catch {
-    // Not cached in storage yet
   }
 
   // 2. Fetch PDF buffer and extract page 1
