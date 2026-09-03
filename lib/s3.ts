@@ -6,18 +6,66 @@ if (typeof globalThis.WebSocket === "undefined") {
   (globalThis as any).WebSocket = ws;
 }
 
-// Initialize Supabase Client for Storage operations
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || "";
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
+// Initialize Primary Supabase Client
+const primaryUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || "";
+const primaryKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
 
-export const supabase: SupabaseClient = createClient(supabaseUrl, supabaseKey, {
+export const supabase: SupabaseClient = createClient(primaryUrl, primaryKey, {
   auth: {
     persistSession: false,
   },
 });
 
+// Initialize Fallback Supabase Client (if configured)
+const fallbackUrl = process.env.SUPABASE_FALLBACK_URL || "";
+const fallbackKey = process.env.SUPABASE_FALLBACK_SERVICE_ROLE_KEY || "";
+
+export const supabaseFallback: SupabaseClient | null =
+  fallbackUrl && fallbackKey
+    ? createClient(fallbackUrl, fallbackKey, {
+        auth: {
+          persistSession: false,
+        },
+      })
+    : null;
+
 function getBucketName(): string {
   return process.env.SUPABASE_STORAGE_BUCKET || process.env.S3_BUCKET_NAME || "pdfs";
+}
+
+/**
+ * Helper to execute storage operations with automatic fallback on quota/service failure
+ */
+async function withStorageFallback<T>(
+  operation: (client: SupabaseClient) => Promise<{ data: T | null; error: any }>,
+  actionName: string
+): Promise<{ data: T | null; error: any }> {
+  const result = await operation(supabase);
+
+  // If operation succeeded, return data
+  if (!result.error && result.data) {
+    return result;
+  }
+
+  // Check if failure is due to quota/service restriction (402, 429, etc.)
+  const isServiceError =
+    result.error &&
+    ((result.error as any).status === 402 ||
+      (result.error as any).statusCode === "402" ||
+      (result.error as any).status === 429 ||
+      (result.error as any).statusCode === "429" ||
+      result.error.message?.includes("exceed_egress_quota") ||
+      result.error.message?.includes("restricted"));
+
+  if (isServiceError && supabaseFallback) {
+    console.warn(`[STORAGE_FALLBACK] Primary Supabase failed for ${actionName} (${result.error?.message}). Falling back to secondary Supabase...`);
+    const fallbackResult = await operation(supabaseFallback);
+    if (!fallbackResult.error && fallbackResult.data) {
+      return fallbackResult;
+    }
+  }
+
+  return result;
 }
 
 /**
@@ -38,12 +86,27 @@ export async function uploadToS3(
     const bucketName = getBucketName();
     const contentType = fileExtension === "pdf" ? "application/pdf" : `image/${fileExtension}`;
 
-    const { error } = await supabase.storage
+    let { error } = await supabase.storage
       .from(bucketName)
       .upload(uniqueFilename, file, {
         contentType,
         upsert: true,
       });
+
+    if (error && supabaseFallback) {
+      console.warn("[STORAGE_FALLBACK] Retrying uploadToS3 on fallback Supabase...");
+      const fallbackUpload = await supabaseFallback.storage
+        .from(bucketName)
+        .upload(uniqueFilename, file, {
+          contentType,
+          upsert: true,
+        });
+      if (!fallbackUpload.error) {
+        error = null;
+        const { data } = supabaseFallback.storage.from(bucketName).getPublicUrl(uniqueFilename);
+        return data.publicUrl;
+      }
+    }
 
     if (error) {
       console.error("Error uploading to Supabase Storage:", error);
@@ -72,12 +135,25 @@ export async function uploadPaymentScreenshot(
   const uniqueKey = `payment-screenshots/${crypto.randomUUID()}.${ext}`;
   const bucketName = getBucketName();
 
-  const { error } = await supabase.storage
+  let { error } = await supabase.storage
     .from(bucketName)
     .upload(uniqueKey, file, {
       contentType,
       upsert: true,
     });
+
+  if (error && supabaseFallback) {
+    console.warn("[STORAGE_FALLBACK] Retrying uploadPaymentScreenshot on fallback Supabase...");
+    const fallbackUpload = await supabaseFallback.storage
+      .from(bucketName)
+      .upload(uniqueKey, file, {
+        contentType,
+        upsert: true,
+      });
+    if (!fallbackUpload.error) {
+      return uniqueKey;
+    }
+  }
 
   if (error) {
     console.error("Error uploading payment screenshot to Supabase Storage:", error);
@@ -101,12 +177,25 @@ export async function uploadPrivateFile(
   const uniqueKey = `ebooks/${crypto.randomUUID()}.${fileExtension}`;
   const bucketName = getBucketName();
 
-  const { error } = await supabase.storage
+  let { error } = await supabase.storage
     .from(bucketName)
     .upload(uniqueKey, file, {
       contentType: "application/pdf",
       upsert: true,
     });
+
+  if (error && supabaseFallback) {
+    console.warn("[STORAGE_FALLBACK] Retrying uploadPrivateFile on fallback Supabase...");
+    const fallbackUpload = await supabaseFallback.storage
+      .from(bucketName)
+      .upload(uniqueKey, file, {
+        contentType: "application/pdf",
+        upsert: true,
+      });
+    if (!fallbackUpload.error) {
+      return uniqueKey;
+    }
+  }
 
   if (error) {
     console.error("Error uploading private file to Supabase Storage:", error);
@@ -121,14 +210,25 @@ export async function uploadPrivateFile(
  */
 export async function getUploadPresignedUrl(
   key: string,
-  contentType: string,
+  _contentType: string,
   _expiresIn = 600
 ): Promise<string> {
   const bucketName = getBucketName();
 
-  const { data, error } = await supabase.storage
+  let { data, error } = await supabase.storage
     .from(bucketName)
     .createSignedUploadUrl(key);
+
+  if ((error || !data) && supabaseFallback) {
+    console.warn("[STORAGE_FALLBACK] Retrying getUploadPresignedUrl on fallback Supabase...");
+    const fallbackRes = await supabaseFallback.storage
+      .from(bucketName)
+      .createSignedUploadUrl(key);
+    if (!fallbackRes.error && fallbackRes.data) {
+      data = fallbackRes.data;
+      error = null;
+    }
+  }
 
   if (error || !data) {
     console.error("Error creating signed upload URL:", error);
@@ -161,7 +261,7 @@ export async function getCloudFrontSignedUrl(
 }
 
 /**
- * Generate presigned/signed URL for private file download
+ * Generate presigned/signed URL for private file download with fallback support
  * @param key - Storage Key
  * @param expiresIn - Expiry in seconds (default 3600 = 1 hour)
  * @param responseContentDisposition - Optional Content-Disposition header
@@ -191,8 +291,8 @@ export async function getPresignedUrl(
     }
   }
 
-  const tryGetUrl = async (targetKey: string) => {
-    return await supabase.storage
+  const tryGetUrl = async (client: SupabaseClient, targetKey: string) => {
+    return await client.storage
       .from(bucketName)
       .createSignedUrl(
         targetKey,
@@ -201,18 +301,34 @@ export async function getPresignedUrl(
       );
   };
 
-  // Primary attempt
-  let { data, error } = await tryGetUrl(key);
+  // 1. Primary attempt on active Supabase
+  let { data, error } = await tryGetUrl(supabase, key);
 
-  // If object not found, attempt fallback key path (e.g. without 'ebooks/' prefix or with 'ebooks/' prefix)
+  // Fallback key path (root vs ebooks/ folder)
   if (error && (error as any).statusCode === '404') {
     const fallbackKey = key.startsWith("ebooks/")
       ? key.replace(/^ebooks\//, "")
       : `ebooks/${key}`;
 
-    const fallbackResult = await tryGetUrl(fallbackKey);
+    const fallbackResult = await tryGetUrl(supabase, fallbackKey);
     if (!fallbackResult.error && fallbackResult.data) {
       data = fallbackResult.data;
+      error = null;
+    }
+  }
+
+  // 2. Secondary attempt on fallback Supabase if primary failed (quota limit / error)
+  if ((error || !data) && supabaseFallback) {
+    console.warn(`[STORAGE_FALLBACK] Primary signed URL failed (${error?.message || 'not found'}). Trying fallback Supabase...`);
+    let fallbackAttempt = await tryGetUrl(supabaseFallback, key);
+    if (fallbackAttempt.error && (fallbackAttempt.error as any).statusCode === '404') {
+      const fallbackKey = key.startsWith("ebooks/")
+        ? key.replace(/^ebooks\//, "")
+        : `ebooks/${key}`;
+      fallbackAttempt = await tryGetUrl(supabaseFallback, fallbackKey);
+    }
+    if (!fallbackAttempt.error && fallbackAttempt.data) {
+      data = fallbackAttempt.data;
       error = null;
     }
   }
@@ -226,16 +342,19 @@ export async function getPresignedUrl(
 }
 
 /**
- * Fetch PDF file from Supabase Storage as Buffer (for watermarking / merging)
+ * Fetch PDF file from Supabase Storage as Buffer (for watermarking / merging) with fallback
  * @param key - Storage Key
  * @returns PDF as Buffer
  */
 export async function fetchPdfBuffer(key: string): Promise<Buffer> {
   const bucketName = getBucketName();
 
-  let { data, error } = await supabase.storage
-    .from(bucketName)
-    .download(key);
+  const tryDownload = async (client: SupabaseClient, targetKey: string) => {
+    return await client.storage.from(bucketName).download(targetKey);
+  };
+
+  // 1. Primary attempt on active Supabase
+  let { data, error } = await tryDownload(supabase, key);
 
   // Fallback for key location (root vs ebooks/ folder)
   if (error && (error as any).statusCode === '404') {
@@ -243,12 +362,25 @@ export async function fetchPdfBuffer(key: string): Promise<Buffer> {
       ? key.replace(/^ebooks\//, "")
       : `ebooks/${key}`;
 
-    const fallbackResult = await supabase.storage
-      .from(bucketName)
-      .download(fallbackKey);
-
+    const fallbackResult = await tryDownload(supabase, fallbackKey);
     if (!fallbackResult.error && fallbackResult.data) {
       data = fallbackResult.data;
+      error = null;
+    }
+  }
+
+  // 2. Secondary attempt on fallback Supabase if primary failed (e.g. quota limit)
+  if ((error || !data) && supabaseFallback) {
+    console.warn(`[STORAGE_FALLBACK] Primary PDF download failed (${error?.message || 'not found'}). Trying fallback Supabase...`);
+    let fallbackAttempt = await tryDownload(supabaseFallback, key);
+    if (fallbackAttempt.error && (fallbackAttempt.error as any).statusCode === '404') {
+      const fallbackKey = key.startsWith("ebooks/")
+        ? key.replace(/^ebooks\//, "")
+        : `ebooks/${key}`;
+      fallbackAttempt = await tryDownload(supabaseFallback, fallbackKey);
+    }
+    if (!fallbackAttempt.error && fallbackAttempt.data) {
+      data = fallbackAttempt.data;
       error = null;
     }
   }

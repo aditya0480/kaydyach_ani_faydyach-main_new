@@ -1,5 +1,5 @@
 import { PDFDocument, PDFName, PDFRawStream } from "pdf-lib";
-import { fetchPdfBuffer, supabase } from "./s3";
+import { fetchPdfBuffer, supabase, supabaseFallback } from "./s3";
 
 function getBucketName(): string {
   return process.env.SUPABASE_STORAGE_BUCKET || process.env.S3_BUCKET_NAME || "pdfs";
@@ -63,7 +63,14 @@ export async function getOrGenerateCoverImage(ebookId: string, pdfKey: string): 
 
   // 1. Check if cover image is already cached in Supabase Storage
   try {
-    const { data, error } = await supabase.storage.from(bucketName).download(coverKey);
+    let { data, error } = await supabase.storage.from(bucketName).download(coverKey);
+    if ((error || !data) && supabaseFallback) {
+      const fallbackDownload = await supabaseFallback.storage.from(bucketName).download(coverKey);
+      if (!fallbackDownload.error && fallbackDownload.data) {
+        data = fallbackDownload.data;
+        error = null;
+      }
+    }
     if (data && !error) {
       const arrayBuffer = await data.arrayBuffer();
       const buffer = Buffer.from(arrayBuffer);
@@ -86,10 +93,23 @@ export async function getOrGenerateCoverImage(ebookId: string, pdfKey: string): 
     if (!extracted) return null;
 
     // 3. Cache extracted cover image in Supabase
-    await supabase.storage.from(bucketName).upload(coverKey, extracted.buffer, {
-      contentType: extracted.contentType,
-      upsert: true,
-    });
+    supabase.storage
+      .from(bucketName)
+      .upload(coverKey, extracted.buffer, {
+        contentType: extracted.contentType,
+        upsert: true,
+      })
+      .catch(() => {
+        if (supabaseFallback) {
+          supabaseFallback.storage
+            .from(bucketName)
+            .upload(coverKey, extracted.buffer, {
+              contentType: extracted.contentType,
+              upsert: true,
+            })
+            .catch(() => {});
+        }
+      });
 
     coverMemoryCache.set(ebookId, extracted);
     return extracted;

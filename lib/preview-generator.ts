@@ -1,5 +1,5 @@
 import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
-import { fetchPdfBuffer, supabase } from "./s3";
+import { fetchPdfBuffer, supabase, supabaseFallback } from "./s3";
 
 function getBucketName(): string {
   return process.env.SUPABASE_STORAGE_BUCKET || process.env.S3_BUCKET_NAME || "pdfs";
@@ -26,7 +26,14 @@ export async function getOrGeneratePreviewPdf(
 
   // 1. Check if preview PDF is already cached in Supabase Storage
   try {
-    const { data, error } = await supabase.storage.from(bucketName).download(previewStorageKey);
+    let { data, error } = await supabase.storage.from(bucketName).download(previewStorageKey);
+    if ((error || !data) && supabaseFallback) {
+      const fallbackDownload = await supabaseFallback.storage.from(bucketName).download(previewStorageKey);
+      if (!fallbackDownload.error && fallbackDownload.data) {
+        data = fallbackDownload.data;
+        error = null;
+      }
+    }
     if (data && !error) {
       const arrayBuffer = await data.arrayBuffer();
       const buffer = Buffer.from(arrayBuffer);
@@ -62,7 +69,17 @@ export async function getOrGeneratePreviewPdf(
         contentType: "application/pdf",
         upsert: true,
       })
-      .catch((err) => console.error(`[UPLOAD_PREVIEW_PDF_ERROR] for ${ebookId}:`, err));
+      .catch((err) => {
+        if (supabaseFallback) {
+          supabaseFallback.storage
+            .from(bucketName)
+            .upload(previewStorageKey, previewBuffer, {
+              contentType: "application/pdf",
+              upsert: true,
+            })
+            .catch(() => {});
+        }
+      });
 
     previewMemoryCache.set(ebookId, previewBuffer);
     return previewBuffer;
