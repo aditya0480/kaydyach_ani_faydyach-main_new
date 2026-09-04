@@ -79,19 +79,19 @@ export async function GET(
           status: 200,
           headers: {
             "Content-Type": result.contentType,
-            "Cache-Control": "public, max-age=86400, stale-while-revalidate=604800",
+            "Cache-Control": "public, max-age=31536000, immutable",
           },
         });
       }
     }
 
-    // Fallback: Dynamic branded SVG book cover
+    // Fallback: Dynamic branded SVG book cover (Never cache fallback so updates appear immediately)
     const svgContent = generateFallbackSvg(ebookTitle);
     return new NextResponse(svgContent, {
       status: 200,
       headers: {
         "Content-Type": "image/svg+xml",
-        "Cache-Control": "public, max-age=86400, stale-while-revalidate=604800",
+        "Cache-Control": "no-cache, no-store, must-revalidate",
       },
     });
   } catch (error) {
@@ -101,7 +101,7 @@ export async function GET(
       status: 200,
       headers: {
         "Content-Type": "image/svg+xml",
-        "Cache-Control": "public, max-age=3600",
+        "Cache-Control": "no-cache, no-store, must-revalidate",
       },
     });
   }
