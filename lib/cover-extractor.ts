@@ -95,9 +95,10 @@ export async function getOrGenerateCoverImage(ebookId: string, pdfKey: string): 
     if (!extracted) return null;
 
     // 3. Cache extracted cover image in Supabase
+    const uploadKey = `covers/${ebookId}.${extracted.contentType === "image/png" ? "png" : "jpg"}`;
     supabase.storage
       .from(bucketName)
-      .upload(coverKey, extracted.buffer, {
+      .upload(uploadKey, extracted.buffer, {
         contentType: extracted.contentType,
         upsert: true,
       })
@@ -105,7 +106,7 @@ export async function getOrGenerateCoverImage(ebookId: string, pdfKey: string): 
         if (supabaseFallback) {
           supabaseFallback.storage
             .from(bucketName)
-            .upload(coverKey, extracted.buffer, {
+            .upload(uploadKey, extracted.buffer, {
               contentType: extracted.contentType,
               upsert: true,
             })
